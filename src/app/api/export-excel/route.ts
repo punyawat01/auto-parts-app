@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import * as XLSX from 'xlsx';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
     try {
         const parts = await prisma.part.findMany({
