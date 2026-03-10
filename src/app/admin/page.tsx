@@ -5,6 +5,8 @@ import { Plus, Edit, Trash2 } from 'lucide-react'
 import DeletePartButton from './DeletePartButton'
 import ExcelActions from '@/components/ExcelActions'
 
+export const dynamic = 'force-dynamic'
+
 export default async function AdminPage() {
     const parts = await prisma.part.findMany({
         include: { category: true, alternativeNumbers: true },

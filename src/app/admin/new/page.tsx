@@ -3,6 +3,8 @@ import PartForm from '../PartForm'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default function NewPartPage() {
     return (
         <div className="min-h-screen flex flex-col bg-background">
