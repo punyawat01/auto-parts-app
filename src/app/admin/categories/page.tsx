@@ -9,6 +9,14 @@ export default async function CategoriesPage() {
         include: {
             _count: {
                 select: { parts: true }
+            },
+            subcategories: {
+                orderBy: { name: 'asc' },
+                include: {
+                    _count: {
+                        select: { parts: true }
+                    }
+                }
             }
         }
     });

@@ -32,6 +32,32 @@ export async function importPartsFromExcel(data: any[]) {
                 }
             }
 
+            // Prepare Subcategory
+            let subcategoryId = null;
+            const subcategoryName = row['หมวดหมู่ย่อย']?.toString().trim();
+            if (subcategoryName && categoryId) {
+                // Look for existing subcategory
+                const existingSub = await prisma.subcategory.findFirst({
+                    where: {
+                        name: subcategoryName,
+                        categoryId: categoryId
+                    }
+                });
+
+                if (existingSub) {
+                    subcategoryId = existingSub.id;
+                } else {
+                    // Create new subcategory
+                    const newSub = await prisma.subcategory.create({
+                        data: {
+                            name: subcategoryName,
+                            categoryId: categoryId
+                        }
+                    });
+                    subcategoryId = newSub.id;
+                }
+            }
+
             // Dimension parsing helper
             const pFloat = (val: any) => {
                 if (!val) return null;
@@ -43,6 +69,8 @@ export async function importPartsFromExcel(data: any[]) {
                 partNumber,
                 name,
                 partBrand: row['ยี่ห้ออะไหล่']?.toString().trim() || null,
+                engineCode: row['รหัสเครื่องยนต์']?.toString().trim() || null,
+                chassisNumber: row['เลขตัวถัง']?.toString().trim() || null,
                 price: pFloat(row['ราคา']),
                 width: pFloat(row['กว้าง (A)']),
                 length: pFloat(row['ยาว (B)']),
@@ -50,7 +78,8 @@ export async function importPartsFromExcel(data: any[]) {
                 innerDiameter: pFloat(row['รูใน (ID)']),
                 outerDiameter: pFloat(row['รูนอก (OD)']),
                 description: row['รายละเอียด']?.toString().trim() || null,
-                categoryId
+                categoryId,
+                subcategoryId
             };
 
             // Upsert the core part

@@ -6,9 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 // --- VEHICLE STRUCTURE ---
@@ -53,8 +52,22 @@ model Category {
   id        Int      @id @default(autoincrement())
   name      String   @unique
   parts     Part[]
+  subcategories Subcategory[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// e.g. Brake Pads, Rotors
+model Subcategory {
+  id         Int      @id @default(autoincrement())
+  name       String
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  parts      Part[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([categoryId, name])
 }
 
 // e.g. Brake Pad X
@@ -64,7 +77,10 @@ model Part {
   name            String          // ชื่ออะไหล่
   partBrand       String?         // ยี่ห้อของตัวอะไหล่เอง (เช่น Brembo, แท้ศูนย์)
   description     String?         // รายละเอียด
+  engineCode      String?         // รหัสเครื่องยนต์
+  chassisNumber   String?         // เลขตัวถัง (VIN)
   price           Float?          // ราคา (Optional, เผื่อไม่ต้องการใส่)
+  imageUrl        String?         // URL รูปภาพ
   
   // Dimensions
   width           Float?          // กว้าง (มม. หรือ ซม.)
@@ -75,6 +91,8 @@ model Part {
 
   categoryId      Int?
   category        Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  subcategoryId   Int?
+  subcategory     Subcategory?    @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
   compatibilities Compatibility[] // รุ่นรถที่รองรับ
   alternativeNumbers AlternativePartNumber[] // รหัสอะไหล่ทดแทน/OEM/โรงงาน
   createdAt       DateTime        @default(now())

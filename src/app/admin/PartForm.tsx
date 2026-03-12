@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { savePart, SavePartInput } from '@/app/actions/admin'
-import { getCategories } from '@/app/actions/parts'
+import { getCategories, getSubcategories } from '@/app/actions/parts'
 import { getBrands, getModelsByBrand, getYearsByModel } from '@/app/actions/vehicles'
 import { Loader2, Plus, Trash2, Pencil } from 'lucide-react'
+import { getDimensionConfigs, DimensionField } from '@/lib/dimensionConfig'
 
 // Basic typescript definitions for the form
 type CompatibilityItem = {
@@ -23,6 +24,7 @@ type AlternativeNumberItem = {
 export default function PartForm({ initialData }: { initialData?: any }) {
     const router = useRouter();
     const [categories, setCategories] = useState<any[]>([]);
+    const [subcategories, setSubcategories] = useState<any[]>([]);
     const [brands, setBrands] = useState<any[]>([]);
 
     const [isSaving, setIsSaving] = useState(false);
@@ -32,9 +34,12 @@ export default function PartForm({ initialData }: { initialData?: any }) {
     const [partNumber, setPartNumber] = useState(initialData?.partNumber || '');
     const [name, setName] = useState(initialData?.name || '');
     const [partBrand, setPartBrand] = useState(initialData?.partBrand || '');
+    const [engineCode, setEngineCode] = useState(initialData?.engineCode || '');
+    const [chassisNumber, setChassisNumber] = useState(initialData?.chassisNumber || '');
     const [description, setDescription] = useState(initialData?.description || '');
     const [price, setPrice] = useState<string>(initialData?.price ? String(initialData.price) : '');
     const [categoryId, setCategoryId] = useState<string>(initialData?.categoryId ? String(initialData.categoryId) : '');
+    const [subcategoryId, setSubcategoryId] = useState<string>(initialData?.subcategoryId ? String(initialData.subcategoryId) : '');
 
     // Dimensions State
     const [width, setWidth] = useState<string>(initialData?.width ? String(initialData.width) : '');
@@ -62,6 +67,14 @@ export default function PartForm({ initialData }: { initialData?: any }) {
     const [newAltNumber, setNewAltNumber] = useState('');
     const [newAltNote, setNewAltNote] = useState('');
 
+    // Find category name for dimensions
+    const selectedCategoryObj = categories.find(c => String(c.id) === String(categoryId));
+    const dimensionConfigs = getDimensionConfigs(selectedCategoryObj?.name);
+    
+
+    const hasDim = (key: DimensionField) => dimensionConfigs.some(c => c.key === key);
+    const getDimLabel = (key: DimensionField) => dimensionConfigs.find(c => c.key === key)?.label || '';
+
     // Load Categories & Brands
     useEffect(() => {
         getCategories().then(res => { if (res.success) setCategories(res.data || []) });
@@ -86,6 +99,16 @@ export default function PartForm({ initialData }: { initialData?: any }) {
             })));
         }
     }, [initialData]);
+
+    // Handle Category change to load Subcategories
+    useEffect(() => {
+        setSubcategories([]);
+        if (categoryId) {
+            getSubcategories(Number(categoryId)).then(res => {
+                if (res.success) setSubcategories(res.data || []);
+            });
+        }
+    }, [categoryId]);
 
     // Handle New Compatibility Brand Change (Autocomplete)
     useEffect(() => {
@@ -209,6 +232,8 @@ export default function PartForm({ initialData }: { initialData?: any }) {
         }
     };
 
+
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
@@ -250,6 +275,8 @@ export default function PartForm({ initialData }: { initialData?: any }) {
             partNumber,
             name,
             partBrand,
+            engineCode,
+            chassisNumber,
             description,
             price: price ? parseFloat(price) : undefined,
             width: width ? parseFloat(width) : undefined,
@@ -258,6 +285,7 @@ export default function PartForm({ initialData }: { initialData?: any }) {
             innerDiameter: innerDiameter ? parseFloat(innerDiameter) : undefined,
             outerDiameter: outerDiameter ? parseFloat(outerDiameter) : undefined,
             categoryId: categoryId ? Number(categoryId) : undefined,
+            subcategoryId: subcategoryId ? Number(subcategoryId) : undefined,
             compatibilities: finalCompatibilities.map(c => ({
                 brandName: c.brandName,
                 modelName: c.modelName,
@@ -287,6 +315,7 @@ export default function PartForm({ initialData }: { initialData?: any }) {
             )}
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-8">
+            
 
                 {/* Basic Info */}
                 <div>
@@ -305,10 +334,25 @@ export default function PartForm({ initialData }: { initialData?: any }) {
                             <input value={partBrand} onChange={e => setPartBrand(e.target.value)} placeholder="เช่น Brembo, แท้ศูนย์" className="p-2 border border-border rounded-lg bg-background" />
                         </div>
                         <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium">หมวดหมู่ (Category)</label>
-                            <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="p-2 border border-border rounded-lg bg-background">
+                            <label className="text-sm font-medium">รหัสเครื่องยนต์ (Engine Code)</label>
+                            <input value={engineCode} onChange={e => setEngineCode(e.target.value)} placeholder="เช่น 1GD, 2TR" className="p-2 border border-border rounded-lg bg-background" />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <label className="text-sm font-medium">เลขตัวถัง (Chassis No./VIN)</label>
+                            <input value={chassisNumber} onChange={e => setChassisNumber(e.target.value)} placeholder="เช่น GUN122, TGN140" className="p-2 border border-border rounded-lg bg-background" />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <label className="text-sm font-medium">หมวดหมู่หลัก (Category)</label>
+                            <select value={categoryId} onChange={e => { setCategoryId(e.target.value); setSubcategoryId(''); }} className="p-2 border border-border rounded-lg bg-background">
                                 <option value="">-- ไม่ระบุ --</option>
                                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <label className="text-sm font-medium">หมวดหมู่ย่อย (Subcategory)</label>
+                            <select value={subcategoryId} onChange={e => setSubcategoryId(e.target.value)} disabled={!categoryId || subcategories.length === 0} className="p-2 border border-border rounded-lg bg-background disabled:opacity-50">
+                                <option value="">-- ไม่ระบุ --</option>
+                                {subcategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                             </select>
                         </div>
                         <div className="flex flex-col gap-2">
@@ -326,26 +370,36 @@ export default function PartForm({ initialData }: { initialData?: any }) {
                 <div>
                     <h3 className="text-lg font-semibold border-b border-border pb-2 mb-4">ขนาดอะไหล่ (Dimensions)</h3>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium">A - กว้าง (Width)</label>
-                            <input type="number" step="0.01" value={width} onChange={e => setWidth(e.target.value)} placeholder="เช่น 10.5" className="p-2 border border-border rounded-lg bg-background" />
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium">B - ยาว (Length)</label>
-                            <input type="number" step="0.01" value={length} onChange={e => setLength(e.target.value)} placeholder="เช่น 20.0" className="p-2 border border-border rounded-lg bg-background" />
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium">C - สูง (Height)</label>
-                            <input type="number" step="0.01" value={height} onChange={e => setHeight(e.target.value)} placeholder="เช่น 5.0" className="p-2 border border-border rounded-lg bg-background" />
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium text-blue-600 dark:text-blue-400">วงใน ID (Inner)</label>
-                            <input type="number" step="0.01" value={innerDiameter} onChange={e => setInnerDiameter(e.target.value)} placeholder="เช่น 12.5" className="p-2 border border-border rounded-lg bg-background border-blue-200 dark:border-blue-900 focus:ring-blue-500" />
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium text-blue-600 dark:text-blue-400">วงนอก OD (Outer)</label>
-                            <input type="number" step="0.01" value={outerDiameter} onChange={e => setOuterDiameter(e.target.value)} placeholder="เช่น 25.0" className="p-2 border border-border rounded-lg bg-background border-blue-200 dark:border-blue-900 focus:ring-blue-500" />
-                        </div>
+                        {hasDim('width') && (
+                            <div className="flex flex-col gap-2">
+                                <label className="text-sm font-medium">{getDimLabel('width')}</label>
+                                <input type="number" step="0.01" value={width} onChange={e => setWidth(e.target.value)} placeholder="0.00" className="p-2 border border-border rounded-lg bg-background" />
+                            </div>
+                        )}
+                        {hasDim('length') && (
+                            <div className="flex flex-col gap-2">
+                                <label className="text-sm font-medium">{getDimLabel('length')}</label>
+                                <input type="number" step="0.01" value={length} onChange={e => setLength(e.target.value)} placeholder="0.00" className="p-2 border border-border rounded-lg bg-background" />
+                            </div>
+                        )}
+                        {hasDim('height') && (
+                            <div className="flex flex-col gap-2">
+                                <label className="text-sm font-medium">{getDimLabel('height')}</label>
+                                <input type="number" step="0.01" value={height} onChange={e => setHeight(e.target.value)} placeholder="0.00" className="p-2 border border-border rounded-lg bg-background" />
+                            </div>
+                        )}
+                        {hasDim('innerDiameter') && (
+                            <div className="flex flex-col gap-2">
+                                <label className="text-sm font-medium text-blue-600 dark:text-blue-400">{getDimLabel('innerDiameter')}</label>
+                                <input type="number" step="0.01" value={innerDiameter} onChange={e => setInnerDiameter(e.target.value)} placeholder="0.00" className="p-2 border border-border rounded-lg bg-background border-blue-200 dark:border-blue-900 focus:ring-blue-500" />
+                            </div>
+                        )}
+                        {hasDim('outerDiameter') && (
+                            <div className="flex flex-col gap-2">
+                                <label className="text-sm font-medium text-blue-600 dark:text-blue-400">{getDimLabel('outerDiameter')}</label>
+                                <input type="number" step="0.01" value={outerDiameter} onChange={e => setOuterDiameter(e.target.value)} placeholder="0.00" className="p-2 border border-border rounded-lg bg-background border-blue-200 dark:border-blue-900 focus:ring-blue-500" />
+                            </div>
+                        )}
                     </div>
                 </div>
 

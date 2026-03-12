@@ -9,6 +9,8 @@ export type SavePartInput = {
     partNumber: string;
     name: string;
     partBrand?: string;
+    engineCode?: string;
+    chassisNumber?: string;
     description?: string;
     price?: number;
     width?: number;
@@ -17,6 +19,7 @@ export type SavePartInput = {
     innerDiameter?: number;
     outerDiameter?: number;
     categoryId?: number;
+    subcategoryId?: number;
     compatibilities?: { brandName: string; modelName: string; year: string; notes?: string }[];
     alternativeNumbers?: { number: string; note?: string }[];
 }
@@ -24,7 +27,7 @@ export type SavePartInput = {
 export async function savePart(data: SavePartInput) {
     try {
         const {
-            id, partNumber, name, partBrand, description, price, categoryId, compatibilities, alternativeNumbers,
+            id, partNumber, name, partBrand, engineCode, chassisNumber, description, price, categoryId, subcategoryId, compatibilities, alternativeNumbers,
             width, length, height, innerDiameter, outerDiameter
         } = data;
 
@@ -36,6 +39,8 @@ export async function savePart(data: SavePartInput) {
                     partNumber,
                     name,
                     partBrand,
+                    engineCode,
+                    chassisNumber,
                     description,
                     price,
                     width,
@@ -44,6 +49,7 @@ export async function savePart(data: SavePartInput) {
                     innerDiameter,
                     outerDiameter,
                     categoryId,
+                    subcategoryId,
                 }
             });
 
@@ -125,6 +131,7 @@ export async function savePart(data: SavePartInput) {
                     innerDiameter,
                     outerDiameter,
                     categoryId,
+                    subcategoryId,
                 }
             });
 

@@ -1,13 +1,21 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Edit, Trash2, Check, X, Loader2 } from 'lucide-react'
-import { saveCategory, deleteCategory } from '@/app/actions/category'
+import { useState, Fragment } from 'react'
+import { Plus, Edit, Trash2, Check, X, Loader2, ChevronDown, ChevronRight, CornerDownRight } from 'lucide-react'
+import { saveCategory, deleteCategory, saveSubcategory, deleteSubcategory } from '@/app/actions/category'
 
-type CategoryWithCount = {
+export type SubcategoryWithCount = {
+    id: number;
+    name: string;
+    categoryId: number;
+    _count: { parts: number };
+}
+
+export type CategoryWithCount = {
     id: number;
     name: string;
     _count: { parts: number };
+    subcategories?: SubcategoryWithCount[];
 }
 
 export default function CategoryList({ initialCategories }: { initialCategories: CategoryWithCount[] }) {
@@ -21,8 +29,24 @@ export default function CategoryList({ initialCategories }: { initialCategories:
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editName, setEditName] = useState('');
 
+    // State for Subcategories
+    const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
+    const [isAddingSub, setIsAddingSub] = useState<number | null>(null); // Category ID
+    const [newSubName, setNewSubName] = useState('');
+    const [editingSubId, setEditingSubId] = useState<number | null>(null);
+    const [editSubName, setEditSubName] = useState('');
+
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+
+    const toggleExpand = (categoryId: number) => {
+        if (expandedCategories.includes(categoryId)) {
+            setExpandedCategories(expandedCategories.filter(id => id !== categoryId));
+            if (isAddingSub === categoryId) setIsAddingSub(null);
+        } else {
+            setExpandedCategories([...expandedCategories, categoryId]);
+        }
+    };
 
     const handleAddNew = async () => {
         if (!newName.trim()) return;
@@ -73,6 +97,84 @@ export default function CategoryList({ initialCategories }: { initialCategories:
             setCategories(categories.filter(c => c.id !== id));
         } else {
             setError(res.error || 'Failed to delete category');
+        }
+        setIsLoading(false);
+    };
+
+    const handleAddSubcategory = async (categoryId: number) => {
+        if (!newSubName.trim()) return;
+        setIsLoading(true);
+        setError('');
+
+        const res = await saveSubcategory(null, newSubName, categoryId);
+        if (res.success && res.data) {
+            setCategories(categories.map(c => {
+                if (c.id === categoryId) {
+                    const newSub = { ...res.data, _count: { parts: 0 } } as unknown as SubcategoryWithCount;
+                    return {
+                        ...c,
+                        subcategories: [...(c.subcategories || []), newSub].sort((a, b) => a.name.localeCompare(b.name))
+                    };
+                }
+                return c;
+            }));
+            setIsAddingSub(null);
+            setNewSubName('');
+        } else {
+            setError(res.error || 'Failed to add subcategory');
+        }
+        setIsLoading(false);
+    };
+
+    const handleEditSubcategorySave = async (categoryId: number, subId: number) => {
+        if (!editSubName.trim()) return;
+        setIsLoading(true);
+        setError('');
+
+        const res = await saveSubcategory(subId, editSubName, categoryId);
+        if (res.success && res.data) {
+            setCategories(categories.map(c => {
+                if (c.id === categoryId) {
+                    return {
+                        ...c,
+                        subcategories: (c.subcategories || []).map(s => s.id === subId ? { ...s, name: res.data!.name } : s).sort((a, b) => a.name.localeCompare(b.name))
+                    };
+                }
+                return c;
+            }));
+            setEditingSubId(null);
+        } else {
+            setError(res.error || 'Failed to update subcategory');
+        }
+        setIsLoading(false);
+    };
+
+    const handleDeleteSubcategory = async (categoryId: number, subId: number, name: string, count: number) => {
+        if (count > 0) {
+            if (!confirm(`หมวดหมู่ย่อยนี้มีอะไหล่อยู่ ${count} รายการ หากลบหมวดหมู่ย่อยนี้ อะไหล่จะถูกตั้งเป็นไม่มีหมวดหมู่ย่อย\n\nต้องการดำเนินการต่อหรือไม่?`)) {
+                return;
+            }
+        } else {
+            if (!confirm(`คุณต้องการลบหมวดหมู่ย่อย "${name}" ใช่หรือไม่?`)) {
+                return;
+            }
+        }
+
+        setIsLoading(true);
+        setError('');
+        const res = await deleteSubcategory(subId);
+        if (res.success) {
+            setCategories(categories.map(c => {
+                if (c.id === categoryId) {
+                    return {
+                        ...c,
+                        subcategories: (c.subcategories || []).filter(s => s.id !== subId)
+                    };
+                }
+                return c;
+            }));
+        } else {
+            setError(res.error || 'Failed to delete subcategory');
         }
         setIsLoading(false);
     };
@@ -129,58 +231,179 @@ export default function CategoryList({ initialCategories }: { initialCategories:
                             </td>
                         </tr>
                     ) : categories.map(cat => (
-                        <tr key={cat.id} className="border-b border-border hover:bg-muted/20 transition-colors">
-                            <td className="p-4 font-medium">
-                                {editingId === cat.id ? (
-                                    <input
-                                        autoFocus
-                                        className="w-full p-2 border border-border rounded bg-background outline-none focus:border-primary"
-                                        value={editName}
-                                        onChange={(e) => setEditName(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleEditSave(cat.id)}
-                                        disabled={isLoading}
-                                    />
-                                ) : (
-                                    cat.name
-                                )}
-                            </td>
-                            <td className="p-4 text-center">
-                                <span className="bg-muted px-3 py-1 rounded-full text-xs font-semibold text-foreground/70">
-                                    {cat._count.parts}
-                                </span>
-                            </td>
-                            <td className="p-4">
-                                <div className="flex items-center justify-center gap-2">
-                                    {editingId === cat.id ? (
-                                        <>
-                                            <button onClick={() => handleEditSave(cat.id)} disabled={isLoading} className="text-green-600 hover:bg-green-50 p-2 rounded transition-colors disabled:opacity-50">
-                                                {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
-                                            </button>
-                                            <button onClick={() => { setEditingId(null); setError('') }} disabled={isLoading} className="text-foreground/50 hover:bg-muted p-2 rounded transition-colors disabled:opacity-50">
-                                                <X size={18} />
-                                            </button>
-                                        </>
+                        <Fragment key={cat.id}>
+                            <tr className="border-b border-border hover:bg-muted/20 transition-colors">
+                                <td className="p-4">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => toggleExpand(cat.id)}
+                                            className="p-1 hover:bg-muted rounded text-foreground/60 transition-colors"
+                                        >
+                                            {expandedCategories.includes(cat.id) ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                        </button>
+                                        {editingId === cat.id ? (
+                                            <input
+                                                autoFocus
+                                                className="w-full p-2 border border-border rounded bg-background outline-none focus:border-primary font-medium"
+                                                value={editName}
+                                                onChange={(e) => setEditName(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleEditSave(cat.id)}
+                                                disabled={isLoading}
+                                            />
+                                        ) : (
+                                            <span className="font-medium cursor-pointer" onClick={() => toggleExpand(cat.id)}>
+                                                {cat.name}
+                                            </span>
+                                        )}
+                                    </div>
+                                </td>
+                                <td className="p-4 text-center">
+                                    <span className="bg-muted px-3 py-1 rounded-full text-xs font-semibold text-foreground/70">
+                                        {cat._count.parts}
+                                    </span>
+                                </td>
+                                <td className="p-4">
+                                    <div className="flex items-center justify-center gap-2">
+                                        {editingId === cat.id ? (
+                                            <>
+                                                <button onClick={() => handleEditSave(cat.id)} disabled={isLoading} className="text-green-600 hover:bg-green-50 p-2 rounded transition-colors disabled:opacity-50">
+                                                    {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+                                                </button>
+                                                <button onClick={() => { setEditingId(null); setError('') }} disabled={isLoading} className="text-foreground/50 hover:bg-muted p-2 rounded transition-colors disabled:opacity-50">
+                                                    <X size={18} />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    onClick={() => { setEditingId(cat.id); setEditName(cat.name); setError(''); setIsAdding(false); }}
+                                                    disabled={isLoading}
+                                                    className="text-foreground/60 hover:text-primary hover:bg-primary/10 p-2 rounded transition-colors disabled:opacity-50"
+                                                    title="แก้ไขหมวดหมู่"
+                                                >
+                                                    <Edit size={18} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(cat.id, cat.name, cat._count.parts)}
+                                                    disabled={isLoading}
+                                                    className="text-foreground/60 hover:text-red-500 hover:bg-red-50 p-2 rounded transition-colors disabled:opacity-50"
+                                                    title="ลบหมวดหมู่"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+
+                            {/* Subcategories View */}
+                            {expandedCategories.includes(cat.id) && (
+                                <>
+                                    {(cat.subcategories || []).map(sub => (
+                                        <tr key={`sub-${sub.id}`} className="border-b border-border/50 bg-muted/5 hover:bg-muted/20 transition-colors">
+                                            <td className="p-3 pl-12 text-sm">
+                                                <div className="flex items-center gap-2">
+                                                    <CornerDownRight size={14} className="text-foreground/40" />
+                                                    {editingSubId === sub.id ? (
+                                                        <input
+                                                            autoFocus
+                                                            className="w-full text-sm p-1.5 border border-border rounded bg-background outline-none focus:border-primary"
+                                                            value={editSubName}
+                                                            onChange={(e) => setEditSubName(e.target.value)}
+                                                            onKeyDown={(e) => e.key === 'Enter' && handleEditSubcategorySave(cat.id, sub.id)}
+                                                            disabled={isLoading}
+                                                        />
+                                                    ) : (
+                                                        <span className="text-foreground/80">{sub.name}</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                <span className="bg-background border border-border px-2 py-0.5 rounded-full text-[10px] font-medium text-foreground/60">
+                                                    {sub._count.parts}
+                                                </span>
+                                            </td>
+                                            <td className="p-3">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    {editingSubId === sub.id ? (
+                                                        <>
+                                                            <button onClick={() => handleEditSubcategorySave(cat.id, sub.id)} disabled={isLoading} className="text-green-600 hover:bg-green-50 p-1.5 rounded transition-colors disabled:opacity-50">
+                                                                {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                                            </button>
+                                                            <button onClick={() => { setEditingSubId(null); setError('') }} disabled={isLoading} className="text-foreground/50 hover:bg-muted p-1.5 rounded transition-colors disabled:opacity-50">
+                                                                <X size={14} />
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                onClick={() => { setEditingSubId(sub.id); setEditSubName(sub.name); setError(''); setIsAddingSub(null); }}
+                                                                disabled={isLoading}
+                                                                className="text-foreground/50 hover:text-primary hover:bg-primary/10 p-1.5 rounded transition-colors disabled:opacity-50"
+                                                                title="แก้ไขหมวดหมู่ย่อย"
+                                                            >
+                                                                <Edit size={14} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteSubcategory(cat.id, sub.id, sub.name, sub._count.parts)}
+                                                                disabled={isLoading}
+                                                                className="text-foreground/50 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors disabled:opacity-50"
+                                                                title="ลบหมวดหมู่ย่อย"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+
+                                    {/* Add New Subcategory Row */}
+                                    {isAddingSub === cat.id ? (
+                                        <tr className="border-b border-border/50 bg-primary/5">
+                                            <td className="p-3 pl-12">
+                                                <div className="flex items-center gap-2">
+                                                    <CornerDownRight size={14} className="text-primary/60" />
+                                                    <input
+                                                        autoFocus
+                                                        placeholder="ชื่อหมวดหมู่ย่อยใหม่..."
+                                                        className="w-full text-sm p-1.5 border border-border rounded bg-background outline-none focus:border-primary"
+                                                        value={newSubName}
+                                                        onChange={(e) => setNewSubName(e.target.value)}
+                                                        onKeyDown={(e) => e.key === 'Enter' && handleAddSubcategory(cat.id)}
+                                                        disabled={isLoading}
+                                                    />
+                                                </div>
+                                            </td>
+                                            <td className="p-3 text-center text-foreground/40 text-sm">-</td>
+                                            <td className="p-3">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button onClick={() => handleAddSubcategory(cat.id)} disabled={isLoading} className="text-green-600 hover:bg-green-50 p-1.5 rounded transition-colors disabled:opacity-50">
+                                                        {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                                    </button>
+                                                    <button onClick={() => { setIsAddingSub(null); setError('') }} disabled={isLoading} className="text-foreground/50 hover:bg-muted p-1.5 rounded transition-colors disabled:opacity-50">
+                                                        <X size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
                                     ) : (
-                                        <>
-                                            <button
-                                                onClick={() => { setEditingId(cat.id); setEditName(cat.name); setError(''); setIsAdding(false); }}
-                                                disabled={isLoading}
-                                                className="text-foreground/60 hover:text-primary hover:bg-primary/10 p-2 rounded transition-colors disabled:opacity-50"
-                                            >
-                                                <Edit size={18} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(cat.id, cat.name, cat._count.parts)}
-                                                disabled={isLoading}
-                                                className="text-foreground/60 hover:text-red-500 hover:bg-red-50 p-2 rounded transition-colors disabled:opacity-50"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </>
+                                        <tr className="border-b border-border/50 bg-muted/5">
+                                            <td colSpan={3} className="p-2 pl-12">
+                                                <button
+                                                    onClick={() => { setIsAddingSub(cat.id); setNewSubName(''); setEditingSubId(null); setError(''); }}
+                                                    className="flex items-center gap-1.5 text-xs font-medium text-primary/80 hover:text-primary transition-colors px-2 py-1 rounded hover:bg-primary/10"
+                                                >
+                                                    <Plus size={14} />เพิ่มหมวดหมู่ย่อย
+                                                </button>
+                                            </td>
+                                        </tr>
                                     )}
-                                </div>
-                            </td>
-                        </tr>
+                                </>
+                            )}
+                        </Fragment>
                     ))}
                 </tbody>
             </table>

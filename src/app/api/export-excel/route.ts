@@ -8,6 +8,7 @@ export async function GET() {
         const parts = await prisma.part.findMany({
             include: {
                 category: true,
+                subcategory: true,
                 alternativeNumbers: true,
                 compatibilities: {
                     include: {
@@ -35,7 +36,10 @@ export async function GET() {
                 'รหัสอะไหล่': p.partNumber,
                 'ชื่ออะไหล่': p.name,
                 'ยี่ห้ออะไหล่': p.partBrand || '',
+                'รหัสเครื่องยนต์': p.engineCode || '',
+                'เลขตัวถัง': p.chassisNumber || '',
                 'หมวดหมู่': p.category?.name || '',
+                'หมวดหมู่ย่อย': p.subcategory?.name || '',
                 'กว้าง (A)': p.width || '',
                 'ยาว (B)': p.length || '',
                 'สูง (C)': p.height || '',

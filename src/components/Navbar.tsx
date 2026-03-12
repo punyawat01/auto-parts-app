@@ -12,7 +12,7 @@ export default function Navbar() {
                                 <Wrench size={24} />
                             </div>
                             <span className="font-bold text-xl tracking-tight text-foreground">
-                                AutoParts<span className="text-primary">Pro</span>
+                                ANG<span className="text-primary"> PRO</span>
                             </span>
                         </Link>
                     </div>

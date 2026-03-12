@@ -3,19 +3,22 @@
 import { useState, useEffect } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import { getBrands, getModelsByBrand, getYearsByModel } from '@/app/actions/vehicles';
-import { searchParts, getCategories } from '@/app/actions/parts';
+import { searchParts, getCategories, getSubcategories } from '@/app/actions/parts';
 import PartsList from './PartsList';
+import { getDimensionConfigs, DimensionField } from '@/lib/dimensionConfig';
 
 export default function SearchForm() {
     const [brands, setBrands] = useState<any[]>([]);
     const [models, setModels] = useState<any[]>([]);
     const [years, setYears] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
+    const [subcategories, setSubcategories] = useState<any[]>([]);
 
     const [selectedBrand, setSelectedBrand] = useState<string>('');
     const [selectedModel, setSelectedModel] = useState<string>('');
     const [selectedYear, setSelectedYear] = useState<string>('');
     const [selectedCategory, setSelectedCategory] = useState<string>('');
+    const [selectedSubcategory, setSelectedSubcategory] = useState<string>('');
     const [searchTerm, setSearchTerm] = useState<string>('');
 
     // Dimensions State
@@ -43,6 +46,14 @@ export default function SearchForm() {
         getBrands(catId).then(res => {
             if (res.success) setBrands(res.data || []);
         });
+
+        // Load Subcategories
+        setSubcategories([]);
+        if (catId) {
+            getSubcategories(catId).then(res => {
+                if (res.success) setSubcategories(res.data || []);
+            });
+        }
     }, [selectedCategory]);
 
     // Handle Model Change (Autocomplete, filtered by Category)
@@ -79,6 +90,7 @@ export default function SearchForm() {
             modelName: selectedModel || undefined,
             year: selectedYear || undefined,
             categoryId: selectedCategory ? Number(selectedCategory) : undefined,
+            subcategoryId: selectedSubcategory ? Number(selectedSubcategory) : undefined,
             searchTerm: searchTerm || undefined,
             width: width ? parseFloat(width) : undefined,
             length: length ? parseFloat(length) : undefined,
@@ -95,8 +107,8 @@ export default function SearchForm() {
     };
 
     return (
-        <div className="flex flex-col gap-8 w-full">
-            <div className="bg-card shadow-sm border border-border rounded-xl p-6 md:p-8 w-full max-w-4xl mx-auto transition-all">
+        <div className="flex flex-col gap-8 w-full relative z-10">
+            <div className="bg-card/90 backdrop-blur-xl shadow-2xl border border-white/20 dark:border-border/50 rounded-2xl p-6 md:p-8 w-full max-w-5xl mx-auto transition-all hover:shadow-primary/5">
                 <form onSubmit={handleSearch} className="flex flex-col gap-6">
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -106,7 +118,7 @@ export default function SearchForm() {
                             <select
                                 className="p-3 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all disabled:opacity-50"
                                 value={selectedCategory}
-                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                onChange={(e) => { setSelectedCategory(e.target.value); setSelectedSubcategory(''); }}
                             >
                                 <option value="">--- ทั้งหมด ---</option>
                                 {categories.map(c => (
@@ -114,6 +126,23 @@ export default function SearchForm() {
                                 ))}
                             </select>
                         </div>
+
+                        {/* SUBCATEGORY */}
+                        {selectedCategory && (
+                            <div className="flex flex-col gap-2 relative">
+                                <label className="text-sm font-semibold text-foreground/80">หมวดหมู่ย่อย (Subcategory)</label>
+                                <select
+                                    className="p-3 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all disabled:opacity-50"
+                                    value={selectedSubcategory}
+                                    onChange={(e) => setSelectedSubcategory(e.target.value)}
+                                >
+                                    <option value="">--- ทั้งหมดในหมวดหมู่นี้ ---</option>
+                                    {subcategories.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
                         {/* BRAND */}
                         <div className="flex flex-col gap-2 relative">
@@ -190,7 +219,7 @@ export default function SearchForm() {
                             <button
                                 type="submit"
                                 disabled={isSearching}
-                                className="w-full md:w-auto px-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
+                                className="w-full md:w-auto px-10 py-3 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 text-primary-foreground font-semibold rounded-xl transition-all shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 flex items-center justify-center gap-2 disabled:opacity-70 disabled:hover:translate-y-0"
                             >
                                 {isSearching ? <Loader2 className="animate-spin h-5 w-5" /> : <Search className="h-5 w-5" />}
                                 <span>ค้นหาอะไหล่</span>
@@ -212,26 +241,34 @@ export default function SearchForm() {
 
                         {showAdvanced && (
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-muted/20 p-4 rounded-xl border border-border/50">
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-xs font-semibold text-foreground/70">A - กว้าง</label>
-                                    <input type="number" step="0.01" value={width} onChange={e => setWidth(e.target.value)} placeholder="0.00" className="p-2 border border-border rounded-lg bg-background text-sm" />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-xs font-semibold text-foreground/70">B - ยาว</label>
-                                    <input type="number" step="0.01" value={length} onChange={e => setLength(e.target.value)} placeholder="0.00" className="p-2 border border-border rounded-lg bg-background text-sm" />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-xs font-semibold text-foreground/70">C - สูง</label>
-                                    <input type="number" step="0.01" value={height} onChange={e => setHeight(e.target.value)} placeholder="0.00" className="p-2 border border-border rounded-lg bg-background text-sm" />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-xs font-semibold text-blue-600 dark:text-blue-400">วงใน (ID)</label>
-                                    <input type="number" step="0.01" value={innerDiameter} onChange={e => setInnerDiameter(e.target.value)} placeholder="0.00" className="p-2 border border-blue-200 dark:border-blue-900 rounded-lg bg-background text-sm" />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-xs font-semibold text-blue-600 dark:text-blue-400">วงนอก (OD)</label>
-                                    <input type="number" step="0.01" value={outerDiameter} onChange={e => setOuterDiameter(e.target.value)} placeholder="0.00" className="p-2 border border-blue-200 dark:border-blue-900 rounded-lg bg-background text-sm" />
-                                </div>
+                                {(() => {
+                                    const selectedCatObj = categories.find(c => String(c.id) === String(selectedCategory));
+                                    const configs = getDimensionConfigs(selectedCatObj?.name);
+                                    
+                                    const renderInput = (key: DimensionField, val: string, setVal: any) => {
+                                        const conf = configs.find(c => c.key === key);
+                                        if (!conf) return null;
+                                        const isDia = key === 'innerDiameter' || key === 'outerDiameter';
+                                        return (
+                                            <div key={key} className="flex flex-col gap-2">
+                                                <label className={`text-xs font-semibold ${isDia ? "text-blue-600 dark:text-blue-400" : "text-foreground/70"}`}>
+                                                    {conf.label}
+                                                </label>
+                                                <input type="number" step="0.01" value={val} onChange={e => setVal(e.target.value)} placeholder="0.00" className={`p-2 border rounded-lg bg-background text-sm ${isDia ? "border-blue-200 dark:border-blue-900 focus:ring-blue-500" : "border-border"}`} />
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <>
+                                            {renderInput('width', width, setWidth)}
+                                            {renderInput('length', length, setLength)}
+                                            {renderInput('height', height, setHeight)}
+                                            {renderInput('innerDiameter', innerDiameter, setInnerDiameter)}
+                                            {renderInput('outerDiameter', outerDiameter, setOuterDiameter)}
+                                        </>
+                                    );
+                                })()}
                             </div>
                         )}
                     </div>
